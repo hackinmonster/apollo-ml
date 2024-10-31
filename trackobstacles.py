@@ -53,7 +53,6 @@ config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 pipeline.start(config)
 
-
 previous_depth = None
 velocity = 0  # m/s
 TTC = float('inf')  # initialized as big val
@@ -138,9 +137,12 @@ try:
                     #if box.id is not None:
                         #print(cls + " -> " + str(box.id.item()))
 
-                    if len(object_info[object_id]["depths"]) > 1:
-                        curr_depth = object_info[object_id]["depths"][-1]
-                        last_depth = object_info[object_id]["depths"][-2]
+                    n = 5
+
+                    if len(object_info[object_id]["depths"]) >= 2*n:
+
+                        curr_depth = sum(object_info[object_id]["depths"][-n:]) / n
+                        last_depth = sum(object_info[object_id]["depths"][-2*n:-n]) / n
 
                         #print(curr_depth)
                         if curr_depth > last_depth * 1.02:
@@ -148,7 +150,17 @@ try:
                         elif curr_depth < last_depth * .98:
                             print("CLOSER")
 
+                        delta_depth = curr_depth - last_depth
+                        delta_time = 0.0333
 
+                        velocity = delta_depth / delta_time
+
+                        if velocity < 0:
+                            TTC = curr_depth / abs(velocity)
+                        else:
+                            TTC = 0
+
+                        
         for point in points:
             point.depth = depth_frame.get_distance(point.x, point.y)
             #print(point.toString())
@@ -156,49 +168,6 @@ try:
 
         for point in points:
             x,y = point.x,point.y
-            
-        #the end output of this module is to identify if something is getting closer quickly
-
-        #to do this, we need to be able to calculate time-to-collision for each of the objects classified, plus the center point
-        #in order to do that, we have to compare a point's current depth to its last depth (delta depth)   
-
-        #we cant track by pixel because the center point of an object can change
-        #instead we should track by object
-        #since there can be multiple objects of the same class (like people), we need unique identifiers for each              
-
-        #we also need to consider which objects are a priority (moving vs stationary, different types?)
-
-        #and finally we need to determine a threshold for what constitutes an obstacle that should be avoided, and how (complete stop or deaccelerate?)
-
-        #old code, some might be useful:
-
-        '''
-        if len(object_info) > 1:
-
-
-
-
-            previous_depth = object_info[-2]
-
-
-
-
-            #change in distance
-            delta_depth = current_depth - previous_depth
-            
-            #fps (we need change in time to measure velocity)
-            delta_time = 0.0167  # seconds
-
-            velocity = delta_depth / delta_time
-            
-            if velocity < 0:  #depth decreasing
-                #time to collision
-                TTC = current_depth / abs(velocity)
-            else:
-                TTC = 0
-
-        '''
-        
         
         #adding each point to our window for visualization
         for point in points:
@@ -206,14 +175,14 @@ try:
             #there will be a circle, then two lines of text above it, one for depth, one for TTC
             cv2.circle(depth_colormap, (point.x, point.y), radius=10, color=(0, 0, 0), thickness=-1)
             text = "Depth: " + str(round(point.depth, 3))
-            #text2 = "TTC: " + str(round(TTC, 3))
+            text2 = "TTC: " + str(round(TTC, 3))
             text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale=.5, thickness=20)[0]
             text_x = point.x - text_size[0] // 2  
             text_y = point.y - 30 
             text_y2 = point.y - 15
 
             cv2.putText(depth_colormap, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
-            #cv2.putText(depth_colormap, text2, (text_x, text_y2), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
+            cv2.putText(depth_colormap, text2, (text_x, text_y2), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
 
 
         #show window
