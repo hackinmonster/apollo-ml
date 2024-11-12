@@ -141,36 +141,45 @@ try:
 
                     cv2.rectangle(depth_colormap, (x1, y1), (x2, y2), (255, 0, 255), 3)
 
-#todo: implement exponentially weighted moving average
+            #exponentially weighted moving average
 
-                    #higher n means less temporal resolution, less sensitivity to noise
-                    n = 5
-                    #higher r means more sensitivity to change in depth 
-                    r = .05
+                #higher alpha means more weight to recent data (less smoothing)
+                alpha = 0.2
+                #higher r means lower sensitivity to change in direction
+                r = 0.01
 
-                    if len(object_info[object_id]["depths"]) >= 2*n:
+                if "curr_depth_avg" not in object_info[object_id]:
+                    object_info[object_id]["curr_depth_avg"] = object_info[object_id]["depths"][-1]
+                    object_info[object_id]["last_depth_avg"] = object_info[object_id]["depths"][-1]
 
-                        curr_depth = sum(object_info[object_id]["depths"][-n:]) / n
-                        last_depth = sum(object_info[object_id]["depths"][-2*n:-n]) / n
+                new_depth = object_info[object_id]["depths"][-1]
+                last_depth_avg = object_info[object_id]["curr_depth_avg"]
+                curr_depth_avg = alpha * new_depth + (1 - alpha) * last_depth_avg
 
+                object_info[object_id]["last_depth_avg"] = last_depth_avg
+                object_info[object_id]["curr_depth_avg"] = curr_depth_avg
 
-                        #print(curr_depth)
-                        if curr_depth > last_depth * (1 + r):
-                            print("FURTHER")
-                        elif curr_depth < last_depth * (1 - r):
-                            print("CLOSER")
-                        else:
-                            print("STOPPED")
+                if curr_depth_avg > last_depth_avg * (1 + r):
+                    print("FURTHER")
+                elif curr_depth_avg < last_depth_avg * (1 - r):
+                    print("CLOSER")
+                else:
+                    print("STOPPED")
 
-                        delta_depth = curr_depth - last_depth
-                        delta_time = 0.0333
+                delta_depth = curr_depth_avg - last_depth_avg
+                delta_time = 0.0333
 
-                        velocity = delta_depth / delta_time
+                velocity = delta_depth / delta_time
 
-                        if velocity < 0:
-                            TTC = curr_depth / abs(velocity)
-                        else:
-                            TTC = 0
+                if velocity < 0:
+                    TTC = curr_depth_avg / abs(velocity)
+                else:
+                    TTC = 1000
+
+                if TTC < 5:
+                    print(curr_depth_avg)
+                    #print("Velocity:", velocity, "TTC:", TTC)
+                
         
 #todo: get box_width, box_height 
         '''
