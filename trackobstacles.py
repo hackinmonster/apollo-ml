@@ -21,17 +21,17 @@ import math
 
 #represent a pixel/point on screen
 class Point:
-    def __init__(self, cls, x, y):
+    def __init__(self, cls, x, y, depth):
         self.cls = cls
         self.x = x
         self.y = y
-        self.depth = 0
+        self.depth = depth
     
     def toString(self):
         return f'{self.cls} at ({self.x},{self.y}): {float(self.depth):.3f}m'
 
 #load model
-model = YOLO("yolov8n.pt")
+model = YOLO("yolov8m.pt")
 
 classNames = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat",
                 "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat",
@@ -79,7 +79,7 @@ try:
         #we need this to detect of theres a barrier directly in front of the robot
         center_x = depth_colormap.shape[1] // 2
         center_y = depth_colormap.shape[0] // 2
-        points.append(Point('center', center_x, center_y))
+        points.append(Point('center', center_x, center_y, 0))
 
         #use rgb color image to make model predictions
         results = model.track(color_image, verbose=False, persist=True, tracker="botsort.yaml")
@@ -111,12 +111,20 @@ try:
                     x1, y1 = max(0, x1), max(0, y1)
                     x2, y2 = min(w, x2), min(h, y2)
 
-                    new_x = (x1 + x2) // 2
-                    new_y = (y1 + y2) // 2
-                    new_point = Point(cls, new_x, new_y)
-                    points.append(new_point)
+                    width = depth_frame.get_width()
+                    height = depth_frame.get_height()
+                    data = depth_frame.get_data()
+                    depth_arr = np.asanyarray(data).reshape((height, width))
 
-                    depth = depth_frame.get_distance(new_x, new_y)
+                    min_depth_value = np.percentile(depth_arr, 25)
+
+                    min_depth_index = np.unravel_index(np.argmin(depth_arr, axis=None), depth_arr.shape)
+                    min_depth_y, min_depth_x = min_depth_index
+
+                    new_point = Point(cls, min_depth_x, min_depth_y, min_depth_value)
+
+                    #print(str(classNames[int(box.cls[0])]) + "------>" + str(min_depth_value))
+                    points.append(new_point)
 
                     if object_id not in object_info:
 
@@ -127,28 +135,32 @@ try:
                             'state': 'active',
                             'depths': []
                         }
-                        object_info[object_id]['depths'].append(depth)
+                        object_info[object_id]['depths'].append(min_depth_value)
                     else:
-                        object_info[object_id]['depths'].append(depth)
+                        object_info[object_id]['depths'].append(min_depth_value)
 
-                    #add rectangle to our window
                     cv2.rectangle(depth_colormap, (x1, y1), (x2, y2), (255, 0, 255), 3)
 
-                    #if box.id is not None:
-                        #print(cls + " -> " + str(box.id.item()))
+#todo: implement exponentially weighted moving average
 
+                    #higher n means less temporal resolution, less sensitivity to noise
                     n = 5
+                    #higher r means more sensitivity to change in depth 
+                    r = .05
 
                     if len(object_info[object_id]["depths"]) >= 2*n:
 
                         curr_depth = sum(object_info[object_id]["depths"][-n:]) / n
                         last_depth = sum(object_info[object_id]["depths"][-2*n:-n]) / n
 
+
                         #print(curr_depth)
-                        if curr_depth > last_depth * 1.02:
+                        if curr_depth > last_depth * (1 + r):
                             print("FURTHER")
-                        elif curr_depth < last_depth * .98:
+                        elif curr_depth < last_depth * (1 - r):
                             print("CLOSER")
+                        else:
+                            print("STOPPED")
 
                         delta_depth = curr_depth - last_depth
                         delta_time = 0.0333
@@ -159,38 +171,35 @@ try:
                             TTC = curr_depth / abs(velocity)
                         else:
                             TTC = 0
-
-                        
-        for point in points:
-            point.depth = depth_frame.get_distance(point.x, point.y)
-            #print(point.toString())
-
-
-        for point in points:
-            x,y = point.x,point.y
         
-        #adding each point to our window for visualization
+#todo: get box_width, box_height 
+        '''
         for point in points:
 
-            #there will be a circle, then two lines of text above it, one for depth, one for TTC
-            cv2.circle(depth_colormap, (point.x, point.y), radius=10, color=(0, 0, 0), thickness=-1)
+            print("not implemented")
+
+            
+            box_x = point.x - box_width // 2
+            box_y = point.y - box_height // 2
+
             text = "Depth: " + str(round(point.depth, 3))
             text2 = "TTC: " + str(round(TTC, 3))
-            text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale=.5, thickness=20)[0]
-            text_x = point.x - text_size[0] // 2  
-            text_y = point.y - 30 
-            text_y2 = point.y - 15
+            
+            text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, thickness=1)[0]
+            text_x = box_x + (box_width - text_size[0]) // 2  # Center the text horizontally above the box
+            text_y = box_y - 10  # Position the text just above the bounding box
+
+            text_size2 = cv2.getTextSize(text2, cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, thickness=1)[0]
+            text_y2 = text_y + text_size[1] + 5  # Add space between the first and second lines of text
 
             cv2.putText(depth_colormap, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
             cv2.putText(depth_colormap, text2, (text_x, text_y2), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
+        '''
 
-
-        #show window
         cv2.namedWindow('Depth Stream', cv2.WINDOW_AUTOSIZE)
         cv2.imshow('Depth Stream', depth_colormap)
         key = cv2.waitKey(1)
 
-        #esc key
         if key == 27:
             break
 
