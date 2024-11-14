@@ -58,7 +58,6 @@ velocity = 0  # m/s
 TTC = float('inf')  # initialized as big val
 object_info = {}
 
-
 try:
     while True:
         frames = pipeline.wait_for_frames()
@@ -144,7 +143,7 @@ try:
             #exponentially weighted moving average
 
                 #higher alpha means more weight to recent data (less smoothing)
-                alpha = 0.2
+                alpha = 0.35
                 #higher r means lower sensitivity to change in direction
                 r = 0.01
 
@@ -177,8 +176,8 @@ try:
                     TTC = 1000
 
                 if TTC < 5:
-                    print(curr_depth_avg)
-                    #print("Velocity:", velocity, "TTC:", TTC)
+                    #stop robot
+                    print("not implemented")
                 
         
 #todo: get box_width, box_height 
