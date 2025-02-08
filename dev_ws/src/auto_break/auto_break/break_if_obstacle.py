@@ -154,11 +154,11 @@ def main(args=None):
                     else:
                         TTC = 1000
 
-                    if TTC < 5 or curr_depth_avg < 3:
+                    if TTC < 5 or (1.5 < curr_depth_avg < 3):
                         # Stop robot if TTC < 5 seconds
                         node.stop_robot()
 
-                    elif curr_depth_avg < 2:
+                    elif curr_depth_avg < 1.5:
                         node.reverse_robot()
                 
             cv2.imshow('Depth Stream', depth_colormap)
