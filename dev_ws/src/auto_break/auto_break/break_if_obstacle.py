@@ -39,10 +39,16 @@ class RobotStopNode(Node):
         super().__init__('robot_stop_node')
         self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
         
-    def stop_robot(self):
-        stop_msg = Twist()  # Zero out all velocities
-        self.publisher.publish(stop_msg)
+    def stop_robot(self, duration=1.0, rate=10):
+        stop_msg = Twist()
+        start_time = self.get_clock().now()
+        
+        while (self.get_clock().now() - start_time).nanoseconds / 1e9 < duration:
+            self.publisher.publish(stop_msg)
+            rclpy.spin_once(self, timeout_sec=1.0 / rate)
+
         self.get_logger().info("Stopping the robot due to low TTC.")
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -92,12 +98,25 @@ def main(args=None):
 
                     object_id = box.id.item() if box.id is not None else None
                     cls = classNames[int(box.cls[0])]
+
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                     width, height = depth_frame.get_width(), depth_frame.get_height()
-                    depth_arr = np.asanyarray(depth_frame.get_data()).reshape((height, width))
-                    min_depth_value = np.percentile(depth_arr, 25)
 
-                    min_depth_y, min_depth_x = np.unravel_index(np.argmin(depth_arr, axis=None), depth_arr.shape)
+                    depth_arr = np.asanyarray(depth_frame.get_data()).reshape((height, width))
+                    bbox_depths = depth_arr[y1:y2, x1:x2]
+
+                    valid_depths = bbox_depths[bbox_depths > 0]
+
+                    if valid_depths.size > 0:
+                        min_depth_value = np.min(valid_depths)
+                        min_depth_y, min_depth_x = np.unravel_index(np.argmin(bbox_depths), bbox_depths.shape)
+                        min_depth_y += y1
+                        min_depth_x += x1
+                    else:
+                        min_depth_value = 10
+                        min_depth_x, min_depth_y = (x1 + x2) // 2, (y1 + y2) // 2
+
+                    # Store point with corrected depth
                     new_point = Point(cls, min_depth_x, min_depth_y, min_depth_value)
                     points.append(new_point)
 
