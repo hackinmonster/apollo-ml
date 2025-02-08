@@ -109,7 +109,13 @@ def main(args=None):
                         continue
 
                     object_id = box.id.item() if box.id is not None else None
+
                     cls = classNames[int(box.cls[0])]
+
+                    if cls != 'person':
+                        break
+
+                    print(cls)
 
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                     width, height = depth_frame.get_width(), depth_frame.get_height()
@@ -154,11 +160,11 @@ def main(args=None):
                     else:
                         TTC = 1000
 
-                    if TTC < 5 or (1.5 < curr_depth_avg < 3):
+                    if TTC < 5:
                         # Stop robot if TTC < 5 seconds
                         node.stop_robot()
 
-                    elif curr_depth_avg < 1.5:
+                    if curr_depth_avg < 1.5:
                         node.reverse_robot()
                 
             cv2.imshow('Depth Stream', depth_colormap)
