@@ -123,7 +123,7 @@ def main(args=None):
                     else:
                         TTC = 1000
 
-                    if TTC < 5:
+                    if TTC < 5 or curr_depth_avg < 3:
                         # Stop robot if TTC < 5 seconds
                         node.stop_robot()
                 
