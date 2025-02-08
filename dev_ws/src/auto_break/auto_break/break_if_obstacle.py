@@ -49,6 +49,18 @@ class RobotStopNode(Node):
 
         self.get_logger().info("Stopping the robot due to low TTC.")
 
+    def reverse_robot(self, duration=3.0, rate=10):
+        reverse_msg = Twist()
+        reverse_msg.linear.x = -0.2
+        reverse_msg.angular.z = 0.0
+
+        start_time = self.get_clock().now()
+        while (self.get_clock().now() - start_time).nanoseconds / 1e9 < duration:
+            self.publisher.publish(reverse_msg)
+            rclpy.spin_once(self, timeout_sec=1.0 / rate)
+        
+        self.get_logger().info("Reversing robot due to close proximity to object.")
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -145,6 +157,9 @@ def main(args=None):
                     if TTC < 5 or curr_depth_avg < 3:
                         # Stop robot if TTC < 5 seconds
                         node.stop_robot()
+
+                    elif curr_depth_avg < 2:
+                        node.reverse_robot()
                 
             cv2.imshow('Depth Stream', depth_colormap)
             if cv2.waitKey(1) == 27:
