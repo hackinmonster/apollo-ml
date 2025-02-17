@@ -1,3 +1,4 @@
 Development space for ROS packages dealing with machine learning integration on project Apollo, an autonomous delivery robot. 
 
-![Video](https://github.com/hackinmonster/apollo-ml/blob/main/apollo-rolling.mp4)
+https://github.com/user-attachments/assets/b94565b8-ca30-4e30-8a61-04aaafe3814b
+
